@@ -9,8 +9,13 @@ spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/ikrai_picture
-    username: root
-    password: 123456
+    username: xxx
+    password: xxx
+  profiles:
+    active: local
+  servlet:
+    multipart:
+      max-file-size: 10MB
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
@@ -32,3 +37,11 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.ikrai.ikraipicturebackend.controller
+# 对象存储配置（需要从腾讯云获取）
+cos:
+  client:
+    host: xxx
+    secretId: xxx
+    secretKey: xxx
+    region: xxx
+    bucket: xxx
