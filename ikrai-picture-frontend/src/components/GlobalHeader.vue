@@ -87,6 +87,10 @@ const items = computed(() =>
     if (menu.key?.startsWith('/admin')) {
       return checkAccess(loginUserStore.loginUser, ACCESS_ENUM.ADMIN)
     }
+    // 创建图片需要登录后才显示
+    if (menu.key === '/add_picture') {
+      return checkAccess(loginUserStore.loginUser, ACCESS_ENUM.USER)
+    }
     return true
   })
 )

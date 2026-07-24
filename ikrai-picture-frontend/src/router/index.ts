@@ -43,6 +43,9 @@ const router = createRouter({
       path: '/add_picture',
       name: '创建图片',
       component: AddPicturePage,
+      meta: {
+        access: ACCESS_ENUM.USER,
+      },
     },
     {
       path: '/picture/:id',
