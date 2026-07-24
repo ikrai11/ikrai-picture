@@ -6,6 +6,7 @@ import UserManagePage from '@/pages/admin/UserManagePage.vue'
 import AddPicturePage from '@/pages/AddPicturePage.vue'
 import PictureManagePage from '@/pages/admin/PictureManagePage.vue'
 import PictureDetailPage from '@/pages/PictureDetailPage.vue'
+import AddPictureBatchPage from '@/pages/AddPictureBatchPage.vue'
 import ACCESS_ENUM from '@/access/accessEnum'
 
 const router = createRouter({
@@ -46,6 +47,11 @@ const router = createRouter({
       meta: {
         access: ACCESS_ENUM.USER,
       },
+    },
+    {
+      path: '/add_picture/batch',
+      name: '批量创建图片',
+      component: AddPictureBatchPage,
     },
     {
       path: '/picture/:id',
