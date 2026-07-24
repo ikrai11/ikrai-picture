@@ -68,6 +68,11 @@ const originItems = [
     label: '用户管理',
     title: '用户管理',
   },
+  {  
+  key: '/add_picture',  
+  label: '创建图片',  
+  title: '创建图片',  
+  },
   {
     key: 'others',
     label: h('a', { href: 'https://www.bilibili.com/', target: '_blank' }, 'bilibili'),
