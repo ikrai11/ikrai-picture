@@ -1,12 +1,9 @@
 package com.ikrai.ikraipicturebackend.controller;
 
 
-import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import com.ikrai.ikraipicturebackend.annotation.AuthCheck;
 import com.ikrai.ikraipicturebackend.common.BaseResponse;
 import com.ikrai.ikraipicturebackend.common.DeleteRequest;
@@ -15,6 +12,7 @@ import com.ikrai.ikraipicturebackend.constant.UserConstant;
 import com.ikrai.ikraipicturebackend.exception.BusinessException;
 import com.ikrai.ikraipicturebackend.exception.ErrorCode;
 import com.ikrai.ikraipicturebackend.exception.ThrowUtils;
+import com.ikrai.ikraipicturebackend.manager.cache.PictureCacheManager;
 import com.ikrai.ikraipicturebackend.model.dto.picture.*;
 import com.ikrai.ikraipicturebackend.model.entity.Picture;
 import com.ikrai.ikraipicturebackend.model.entity.User;
@@ -24,9 +22,6 @@ import com.ikrai.ikraipicturebackend.service.PictureService;
 import com.ikrai.ikraipicturebackend.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,7 +30,6 @@ import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 @RestController
 @RequestMapping("/picture")
@@ -49,17 +43,7 @@ public class PictureController {
     private PictureService pictureService;
 
     @Resource
-    private StringRedisTemplate  stringRedisTemplate;
-
-    /**
-     * 构造本地缓存，设置缓存容量和过期时间
-     */
-    private final Cache<String, String> LOCAL_CACHE =
-            Caffeine.newBuilder().initialCapacity(1024)
-                    .maximumSize(10000L)
-                    // 缓存 5 分钟移除
-                    .expireAfterWrite(5L, TimeUnit.MINUTES)
-                    .build();
+    private PictureCacheManager pictureCacheManager;
 
     /**
      * 上传图片（可重新上传）
@@ -217,7 +201,7 @@ public class PictureController {
     }
 
     /**
-     * 分页获取图片列表（封装类，用户可用）
+     * 分页获取图片列表（封装类，用户可用，带多级缓存）
      */
     @PostMapping("/list/page/vo/cache")
     public BaseResponse<Page<PictureVO>> listPictureVOByPageWithCache(@RequestBody PictureQueryRequest pictureQueryRequest,
@@ -229,41 +213,13 @@ public class PictureController {
         //普通用户默认只能查看已过审的数据
         pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
 
-        //查询缓存，缓存没有再查数据库
-        //构建缓存Key
-        String queryKey = JSONUtil.toJsonStr(pictureQueryRequest);
-        String hashKey = DigestUtils.md5DigestAsHex(queryKey.getBytes());
-        String cacheKey = String.format("ikrai: listPictureVOByPage:%s", hashKey);
-
-        //1.先从本地缓存中查询
-        String cacheResult = LOCAL_CACHE.getIfPresent(cacheKey);
-        if (cacheResult != null) {
-            // 缓存中存在，返回缓存结果
-            Page<PictureVO> cachePage = JSONUtil.toBean(cacheResult, Page.class);
-            return ResultUtils.success(cachePage);
-        }
-
-        //2.本地缓存未命中，查询Redis分布式缓存
-        ValueOperations<String, String> opsValue = stringRedisTemplate.opsForValue();
-        cacheResult = opsValue.get(cacheKey);
-        if (cacheResult != null) {
-            // 如果缓存中存在，更新本地缓存，返回结果
-            LOCAL_CACHE.put(cacheKey, cacheResult);
-            Page<PictureVO> cachePage = JSONUtil.toBean(cacheResult, Page.class);
-            return ResultUtils.success(cachePage);
-        }
-        //3.查询数据库
-        Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
-                pictureService.getQueryWrapper(pictureQueryRequest));
-        Page<PictureVO> pictureVOPage = pictureService.getPictureVOPage(picturePage, request);
-        //4.更新缓存
-        //存入Redis缓存
-        String cacheValue = JSONUtil.toJsonStr(pictureVOPage);
-        //设置缓存过期时间:5-10分钟,防止缓存雪崩
-        int cacheExpire = 300+ RandomUtil.randomInt(0,300);
-        opsValue.set(cacheKey, cacheValue, cacheExpire, TimeUnit.SECONDS);
-        //写入本地缓存
-        LOCAL_CACHE.put(cacheKey, cacheValue);
+        // 以请求参数 JSON 作为缓存 key 参数，未命中则查库并回写两级缓存
+        String keyParams = JSONUtil.toJsonStr(pictureQueryRequest);
+        Page<PictureVO> pictureVOPage = pictureCacheManager.getOrLoad(keyParams, () -> {
+            Page<Picture> picturePage = pictureService.page(new Page<>(current, size),
+                    pictureService.getQueryWrapper(pictureQueryRequest));
+            return pictureService.getPictureVOPage(picturePage, request);
+        });
         return ResultUtils.success(pictureVOPage);
     }
 
