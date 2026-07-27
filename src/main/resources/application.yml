@@ -16,6 +16,14 @@ spring:
   servlet:
     multipart:
       max-file-size: 10MB
+  # Redis 配置
+  redis:
+    database: 1
+    host: 127.0.0.1
+    port: 6379
+    timeout: 5000
+
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: false
