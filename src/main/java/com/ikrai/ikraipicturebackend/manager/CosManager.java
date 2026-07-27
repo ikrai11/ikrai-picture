@@ -16,10 +16,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Component
-public class CosManager {  
-  
-    @Resource  
-    private CosClientConfig cosClientConfig;  
+public class CosManager {
+
+    /**
+     * 图片压缩绝对质量（0-100），越低压缩比越大。
+     * 取 60 在体积与清晰度之间取得较大压缩比，可按需调整。
+     */
+    private static final int COMPRESS_QUALITY = 60;
+
+    @Resource
+    private CosClientConfig cosClientConfig;
   
     @Resource  
     private COSClient cosClient;
@@ -58,10 +64,11 @@ public class CosManager {
         // 1 表示返回原图信息
         picOperations.setIsPicInfo(1);
         List<PicOperations.Rule> rules = new ArrayList<>();
-        // 图片压缩（转成 webp 格式）
+        // 图片压缩：转成 webp 并按绝对质量压缩，质量越低压缩比越大
+        // 参考 https://cloud.tencent.com/document/product/436/113300
         String webpKey = FileUtil.mainName(key) + ".webp";
         PicOperations.Rule compressRule = new PicOperations.Rule();
-        compressRule.setRule("imageMogr2/format/webp");
+        compressRule.setRule("imageMogr2/format/webp/quality/" + COMPRESS_QUALITY);
         compressRule.setBucket(cosClientConfig.getBucket());
         compressRule.setFileId(webpKey);
         rules.add(compressRule);
