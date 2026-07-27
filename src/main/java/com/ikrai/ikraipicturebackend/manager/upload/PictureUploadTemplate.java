@@ -63,8 +63,15 @@ public abstract class PictureUploadTemplate {
             if (CollUtil.isNotEmpty(objectList)) {
                 //获取压缩之后的文件信息
                 CIObject compressObjectInfo = objectList.get(0);
+                //默认缩略图信息为压缩图信息，后续根据实际情况调整
+                CIObject thumbnailObjectInfo = compressObjectInfo;
+                //有生成缩略图才获取缩略图信息
+                if (objectList.size() > 1) {
+                    //获取缩略图的文件信息
+                    thumbnailObjectInfo = objectList.get(1);
+                }
                 //封装压缩图的返回结果
-                return buildResult(originFilename,compressObjectInfo);
+                return buildResult(originFilename,compressObjectInfo,thumbnailObjectInfo);
             }
             // 5. 封装返回结果  
             return buildResult(originFilename, file, uploadPath, imageInfo);  
@@ -95,29 +102,33 @@ public abstract class PictureUploadTemplate {
 
     /**
      * 封装压缩图的返回结果
-     * @param originFilename
-     * @param compressedCiObject
+     * @param originFilename 原始文件名
+     * @param compressedCiObject 压缩图对象信息
+     * @param thumbnailCiObject 缩略图对象信息
      * @return
      */
-    private UploadPictureResult buildResult(String originFilename, CIObject compressedCiObject) {
+    private UploadPictureResult buildResult(String originFilename, CIObject compressedCiObject,CIObject thumbnailCiObject) {
         UploadPictureResult uploadPictureResult = new UploadPictureResult();
         int picWidth = compressedCiObject.getWidth();
         int picHeight = compressedCiObject.getHeight();
         double picScale = NumberUtil.round(picWidth * 1.0 / picHeight, 2).doubleValue();
+        // 设置图片为压缩后的地址
+        uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
         uploadPictureResult.setPicName(FileUtil.mainName(originFilename));
         uploadPictureResult.setPicWidth(picWidth);
         uploadPictureResult.setPicHeight(picHeight);
         uploadPictureResult.setPicScale(picScale);
         uploadPictureResult.setPicFormat(compressedCiObject.getFormat());
         uploadPictureResult.setPicSize(compressedCiObject.getSize().longValue());
-        // 设置图片为压缩后的地址
-        uploadPictureResult.setUrl(cosClientConfig.getHost() + "/" + compressedCiObject.getKey());
+        // 设置缩略图地址
+        uploadPictureResult.setThumbnailUrl(cosClientConfig.getHost() + "/" + thumbnailCiObject.getKey());
+
         return uploadPictureResult;
     }
 
 
     /**  
-     * 封装返回结果  
+     * 封装返回结果
      */  
     private UploadPictureResult buildResult(String originFilename, File file, String uploadPath, ImageInfo imageInfo) {  
         UploadPictureResult uploadPictureResult = new UploadPictureResult();  
