@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.ikrai.ikraipicturebackend.exception.BusinessException;
 import com.ikrai.ikraipicturebackend.exception.ErrorCode;
 import com.ikrai.ikraipicturebackend.exception.ThrowUtils;
+import com.ikrai.ikraipicturebackend.manager.CosManager;
 import com.ikrai.ikraipicturebackend.manager.upload.FilePictureUpload;
 import com.ikrai.ikraipicturebackend.manager.upload.PictureUploadTemplate;
 import com.ikrai.ikraipicturebackend.manager.upload.UrlPictureUpload;
@@ -27,6 +28,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.BeanUtils;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -52,6 +54,11 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
 
     @Resource
     private UrlPictureUpload urlPictureUpload;
+
+    @Resource
+    private CosManager cosManager;
+
+
     /**
      * 上传图片
      * @param inputSource 图片来源，可能是文件或 URL
@@ -68,8 +75,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             pictureId = pictureUploadRequest.getId();
         }
         // 如果是更新图片，需要校验图片是否存在
+        Picture oldPicture = null;
         if (pictureId != null) {
-            Picture oldPicture = this.getById(pictureId);
+            oldPicture = this.getById(pictureId);
             ThrowUtils.throwIf(oldPicture == null, ErrorCode.NOT_FOUND_ERROR, "图片不存在");
             // 仅本人或管理员可编辑
             if (!oldPicture.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
@@ -112,6 +120,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             picture.setEditTime(new Date());
         }
         boolean result = this.saveOrUpdate(picture);
+        // 如果是更新，清理旧的 COS 图片资源
+        if (pictureId != null) {
+            this.clearPictureFile(oldPicture);
+        }
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "图片上传失败");
         return PictureVO.objToVo(picture);
     }
@@ -351,6 +363,31 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture> impl
             }
         }
         return uploadCount;
+    }
+
+    /**
+     * 清空图片文件
+     * @param oldPicture
+     */
+    @Async
+    @Override
+    public void clearPictureFile(Picture oldPicture) {
+        // 判断图片是否被多条记录
+        String pictureUrl = oldPicture.getUrl();
+        long count = this.lambdaQuery()
+                .eq(Picture::getUrl, pictureUrl)
+                .count();
+        // 有不止一条记录用到了该图片，不清理
+        if (count > 1) {
+            return;
+        }
+        cosManager.deleteObject(cosManager.getKeyFromUrl(oldPicture.getUrl()));
+        // 清理缩略图
+        String thumbnailUrl = oldPicture.getThumbnailUrl();
+        if (StrUtil.isNotBlank(thumbnailUrl)) {
+            cosManager.deleteObject(cosManager.getKeyFromUrl(thumbnailUrl));
+        }
+
     }
 
 }

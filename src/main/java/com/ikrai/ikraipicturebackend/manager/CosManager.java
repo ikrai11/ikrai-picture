@@ -3,6 +3,7 @@ package com.ikrai.ikraipicturebackend.manager;
 import cn.hutool.core.io.FileUtil;
 import com.ikrai.ikraipicturebackend.config.CosClientConfig;
 import com.qcloud.cos.COSClient;
+import com.qcloud.cos.exception.CosClientException;
 import com.qcloud.cos.model.COSObject;
 import com.qcloud.cos.model.GetObjectRequest;
 import com.qcloud.cos.model.PutObjectRequest;
@@ -87,6 +88,26 @@ public class CosManager {
         putObjectRequest.setPicOperations(picOperations);
         return cosClient.putObject(putObjectRequest);
     }
+
+    /**
+     * 删除对象
+     *
+     * @param key 文件 key
+     */
+    public void deleteObject(String key) throws CosClientException {
+        cosClient.deleteObject(cosClientConfig.getBucket(), key);
+    }
+
+    /**
+     * 从完整 URL 中提取 COS 对象 key
+     *
+     * @param url 完整图片 URL（如 https://host/public/1/xxx.webp）
+     * @return COS 对象 key（如 /public/1/xxx.webp）
+     */
+    public String getKeyFromUrl(String url) {
+        return url.substring(cosClientConfig.getHost().length());
+    }
+
 
 
 }
